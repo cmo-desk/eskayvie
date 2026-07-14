@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Eskayvie · CRM Performance Report</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#F5F6FA; --card:#FFFFFF; --border:#E7E9EE;
+    --text:#111827; --text-muted:#6B7280; --text-dim:#9CA3AF;
+    --purple:#7C3AED; --purple-light:#F3EBFE;
+    --orange:#F5A623; --orange-light:#FFF6E6;
+    --green:#16A34A; --green-light:#E9FBF1;
+    --red:#E53E3E; --red-light:#FDECEC;
+    --blue:#3B82F6; --blue-light:#EAF2FE;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{ background:var(--bg); color:var(--text); font-family:Arial, Helvetica, sans-serif; }
+  .wrap{ max-width:1220px; margin:0 auto; padding:26px 28px 70px; }
+
+  /* ---- Top bar ---- */
+  .topbar{ display:flex; align-items:center; justify-content:space-between; background:var(--card);
+    border:1px solid var(--border); border-radius:14px; padding:16px 22px; margin-bottom:22px; flex-wrap:wrap; gap:12px; }
+  .topbar-left{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .logo{ font-size:22px; font-weight:800; color:var(--purple); letter-spacing:-0.02em; }
+  .badge{ background:var(--purple-light); color:var(--purple); font-size:12px; font-weight:700; padding:5px 12px;
+    border-radius:20px; }
+  .title{ font-size:17px; font-weight:700; color:var(--text); }
+  .date-pill{ background:#F1F2F5; color:var(--text-muted); font-size:12.5px; font-weight:600; padding:7px 14px; border-radius:20px; }
+
+  /* ---- Tabs ---- */
+  .tabs{ display:flex; gap:8px; margin-bottom:22px; flex-wrap:wrap; }
+  .tab-btn{ font-family:Arial, sans-serif; background:var(--card); border:1px solid var(--border); color:var(--text);
+    font-size:13.5px; font-weight:700; padding:11px 20px; border-radius:24px; cursor:pointer; }
+  .tab-btn.on{ background:var(--purple); border-color:var(--purple); color:#fff; }
+  .tab-panel{ display:none; }
+  .tab-panel.on{ display:block; }
+
+  /* ---- KPI cards ---- */
+  .kpi-row{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:18px; }
+  @media (max-width:1000px){ .kpi-row{ grid-template-columns:repeat(2,1fr); } }
+  .kpi-card{ background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+  .kpi-top{ height:5px; }
+  .kpi-body{ padding:16px 18px; }
+  .kpi-label{ font-size:11px; font-weight:700; color:var(--text-dim); letter-spacing:.06em; text-transform:uppercase; margin-bottom:8px; }
+  .kpi-value{ font-size:26px; font-weight:800; color:var(--text); line-height:1.1; }
+  .kpi-value.alert{ color:var(--red); }
+  .kpi-sub{ font-size:12px; color:var(--text-muted); margin-top:5px; }
+  .kpi-breakdown{ display:flex; gap:18px; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); flex-wrap:wrap; }
+  .kpi-breakdown div{ font-size:10.5px; color:var(--text-dim); font-weight:700; text-transform:uppercase; margin-bottom:3px; }
+  .kpi-breakdown b{ display:block; font-size:14px; color:var(--text); font-weight:700; margin-top:2px; }
+
+  /* ---- Target-style callout row ---- */
+  .target-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:26px; }
+  @media (max-width:860px){ .target-row{ grid-template-columns:1fr; } }
+  .target-card{ border-radius:12px; padding:16px 20px; border-left:5px solid; }
+  .target-card .t-label{ font-size:12px; font-weight:700; letter-spacing:.03em; margin-bottom:6px; }
+  .target-card .t-value{ font-size:22px; font-weight:800; color:var(--text); }
+  .target-card .t-sub{ font-size:12px; color:var(--text-muted); margin-top:4px; }
+
+  /* ---- generic section/panel ---- */
+  section{ margin-bottom:34px; }
+  .section-title{ font-size:16px; font-weight:800; margin:0 0 4px; }
+  .section-note{ font-size:12.5px; color:var(--text-muted); margin:0 0 16px; max-width:700px; }
+  .panel{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px 22px; }
+  .panel h3{ font-size:14px; font-weight:800; margin:0 0 14px; }
+  .grid2{ display:grid; grid-template-columns:1.15fr 1fr; gap:16px; }
+  @media (max-width:900px){ .grid2{ grid-template-columns:1fr; } }
+
+  .legend-row{ display:flex; gap:18px; align-items:center; font-size:12.5px; color:var(--text-muted); font-weight:600; margin-bottom:6px; }
+  .legend-dot{ display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:middle; }
+
+  table.scorecard{ width:100%; border-collapse:collapse; font-size:13px; }
+  table.scorecard thead th{ text-align:left; font-size:11px; color:var(--text-dim); font-weight:700; text-transform:uppercase;
+    letter-spacing:.04em; padding:10px 12px; border-bottom:2px solid var(--border); background:#FAFAFC; }
+  table.scorecard thead th.num{ text-align:right; }
+  table.scorecard tbody td{ padding:11px 12px; border-bottom:1px solid var(--border); }
+  table.scorecard tbody td.num{ text-align:right; font-weight:700; }
+  table.scorecard tbody tr{ border-left:4px solid transparent; }
+  table.scorecard tbody tr.status-below{ border-left-color:var(--red); }
+  table.scorecard tbody tr.status-growth{ border-left-color:var(--green); }
+  table.scorecard tbody tr.status-baseline{ border-left-color:var(--blue); }
+  table.scorecard tbody tr.status-neutral{ border-left-color:var(--text-dim); }
+  .status-pill{ font-size:11px; font-weight:800; padding:4px 10px; border-radius:20px; white-space:nowrap; }
+  .status-pill.below{ background:var(--red-light); color:var(--red); }
+  .status-pill.growth{ background:var(--green-light); color:var(--green); }
+  .status-pill.baseline{ background:var(--blue-light); color:var(--blue); }
+  .status-pill.active{ background:var(--green-light); color:var(--green); }
+  .status-pill.passive{ background:#F1F2F5; color:var(--text-muted); }
+  .status-pill.sunset{ background:var(--red-light); color:var(--red); }
+  .up{ color:var(--green); font-weight:700; }
+  .down{ color:var(--red); font-weight:700; }
+  .flag{ color:var(--red); font-weight:800; }
+
+  .table-controls{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:12px; flex-wrap:wrap; }
+  .table-controls input{ background:#FAFAFC; border:1px solid var(--border); border-radius:8px; padding:9px 14px;
+    color:var(--text); font-family:Arial,sans-serif; font-size:13px; width:230px; outline:none; }
+  .table-controls input:focus{ border-color:var(--purple); }
+  .filter-row{ display:flex; gap:6px; flex-wrap:wrap; }
+  .f-btn{ background:#FAFAFC; border:1px solid var(--border); color:var(--text-muted); font-size:11.5px; font-weight:700;
+    padding:6px 12px; border-radius:20px; cursor:pointer; white-space:nowrap; font-family:Arial,sans-serif;}
+  .f-btn.on{ background:var(--purple); color:#fff; border-color:var(--purple); }
+  .cat-tag{ font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:20px; background:var(--purple-light); color:var(--purple); white-space:nowrap; }
+
+  .table-scroll{ max-height:540px; overflow-y:auto; }
+  table.main{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  table.main thead th{ text-align:right; padding:10px 10px; color:var(--text-dim); font-weight:700; font-size:10.5px;
+    text-transform:uppercase; letter-spacing:.04em; border-bottom:2px solid var(--border); cursor:pointer; user-select:none;
+    position:sticky; top:0; background:#FAFAFC; }
+  table.main thead th:first-child, table.main tbody td:first-child{ text-align:left; }
+  table.main thead th.activecol{ color:var(--purple); }
+  table.main tbody td{ text-align:right; padding:9px 10px; border-bottom:1px solid var(--border); }
+  table.main tbody td:first-child{ font-weight:600; }
+  table.main tbody tr:hover{ background:#FAFAFC; }
+
+  .callout{ display:flex; gap:12px; background:var(--red-light); border:1px solid #F6C6C0; border-radius:10px;
+    padding:14px 18px; margin-bottom:18px; }
+  .callout .mark{ color:var(--red); font-weight:800; font-size:13px; }
+  .callout p{ margin:0; font-size:12.5px; color:#7A3A34; line-height:1.6; }
+  .callout b{ color:var(--red); }
+
+  footer{ margin-top:40px; padding-top:16px; border-top:1px solid var(--border); font-size:11.5px; color:var(--text-dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo">eskayvie</div>
+      <div class="badge">CRM Report</div>
+      <div class="title">Unified CRM Performance — Architect + Campaigns</div>
+    </div>
+    <div class="date-pill">1 Jan – 14 Jul 2026</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn on" data-tab="overview">Overview</button>
+    <button class="tab-btn" data-tab="architect">Automated Journeys (Architect)</button>
+    <button class="tab-btn" data-tab="campaigns">Single Campaigns (Blast)</button>
+  </div>
+
+  <!-- ============ OVERVIEW ============ -->
+  <div class="tab-panel on" id="tab-overview">
+    <div class="kpi-row" id="kpiOverview"></div>
+
+    <div class="target-row">
+      <div class="target-card" style="background:var(--purple-light); border-left-color:var(--purple);">
+        <div class="t-label" style="color:var(--purple);">🚀 ARCHITECT (AUTOMATED)</div>
+        <div class="t-value">RM 994,884</div>
+        <div class="t-sub">91.7% of total CRM revenue · 27 active journeys</div>
+      </div>
+      <div class="target-card" style="background:var(--green-light); border-left-color:var(--green);">
+        <div class="t-label" style="color:var(--green);">✅ CAMPAIGNS (BLAST)</div>
+        <div class="t-value">RM 90,589</div>
+        <div class="t-sub">8.3% of total CRM revenue · 94 sends</div>
+      </div>
+      <div class="target-card" style="background:var(--blue-light); border-left-color:var(--blue);">
+        <div class="t-label" style="color:var(--blue);">📌 TOTAL CRM REVENUE</div>
+        <div class="t-value">RM 1,085,473</div>
+        <div class="t-sub">1 Jan – 14 Jul 2026</div>
+      </div>
+    </div>
+
+    <section>
+      <div class="section-title">Revenue Split</div>
+      <p class="section-note">Automated journeys carry the vast majority of CRM revenue; single-blast campaigns are a smaller but still meaningful layer on top.</p>
+      <div class="grid2">
+        <div class="panel"><h3>Architect vs. Campaigns</h3><canvas id="splitChart" height="230"></canvas></div>
+        <div class="panel">
+          <h3>At a glance</h3>
+          <table class="scorecard">
+            <thead><tr><th>Source</th><th class="num">Sends/Entries</th><th class="num">Revenue</th><th class="num">Share</th></tr></thead>
+            <tbody>
+              <tr class="status-baseline"><td>Architect (Journeys)</td><td class="num">966,988</td><td class="num">RM 994,884</td><td class="num">91.7%</td></tr>
+              <tr class="status-growth"><td>Campaigns (Blast)</td><td class="num">3,868,277</td><td class="num">RM 90,589</td><td class="num">8.3%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ ARCHITECT ============ -->
+  <div class="tab-panel" id="tab-architect">
+    <div class="kpi-row" id="kpiArchitect"></div>
+
+    <section>
+      <div class="section-title">The Journey River</div>
+      <p class="section-note">Every contact entering an automated journey, and how much survives to delivery, engagement, and purchase. No individual send date applies — these flows ran continuously across the full window.</p>
+      <div class="panel" id="riverBox"></div>
+    </section>
+
+    <section>
+      <div class="section-title">Channel Effectiveness</div>
+      <p class="section-note">Email carries the most volume, but WhatsApp converts it into revenue at a far higher rate.</p>
+      <div class="grid2">
+        <div class="panel"><h3>Revenue vs. Conversion Rate by channel</h3><canvas id="channelChart" height="230"></canvas></div>
+        <div class="panel">
+          <h3>Channel scorecard</h3>
+          <table class="scorecard" id="channelTable"></table>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-title">Top Revenue Journeys</div>
+      <div class="panel"><canvas id="leaderChart" height="240"></canvas></div>
+    </section>
+
+    <section>
+      <div class="section-title">All Journeys</div>
+      <div class="callout">
+        <span class="mark">⚠ DATA CHECK</span>
+        <p><b>3 journeys show a Conversion Rate or Completion Rate above 100%</b> — Stagnant Rank, Stagnant Rank Silver Gold, and Touch Point 3-5 Customers 2025 (Version 1). Worth confirming the attribution logic behind these with the platform.</p>
+      </div>
+      <div class="table-controls">
+        <input type="text" id="jSearchBox" placeholder="Search journey name…">
+        <div class="filter-row" id="jStatusFilters">
+          <div class="f-btn on" data-status="all">ALL · 97</div>
+          <div class="f-btn" data-status="active">ACTIVE · 27</div>
+          <div class="f-btn" data-status="passive">PASSIVE · 69</div>
+          <div class="f-btn" data-status="sunset">SUNSET · 1</div>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table class="main">
+          <thead><tr>
+            <th data-key="name">Journey</th><th data-key="status">Status</th><th data-key="entered">Entered</th>
+            <th data-key="cr">Conv. Rate</th><th data-key="conversions">Conversions</th>
+            <th data-key="revenue" class="activecol">Revenue (RM)</th><th data-key="aov">AOV (RM)</th>
+          </tr></thead>
+          <tbody id="jTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ CAMPAIGNS ============ -->
+  <div class="tab-panel" id="tab-campaigns">
+    <div class="kpi-row" id="kpiCampaigns"></div>
+
+    <section>
+      <div class="section-title">Revenue by Category</div>
+      <p class="section-note">94 single-blast sends across 13 campaign categories. Scan & Win drives 42% of all blast revenue; Booster Minda content sends nearly 556k emails for almost nothing back.</p>
+      <div class="panel"><canvas id="catChart" height="260"></canvas></div>
+    </section>
+
+    <section>
+      <div class="section-title">All Campaigns</div>
+      <div class="table-controls">
+        <input type="text" id="cSearchBox" placeholder="Search email name…">
+        <div class="filter-row" id="cCatFilters"></div>
+      </div>
+      <div class="table-scroll">
+        <table class="main">
+          <thead><tr>
+            <th data-key="date" class="activecol">Date</th><th data-key="name">Email</th><th data-key="category">Category</th>
+            <th data-key="sent">Sent</th><th data-key="openRate">Open Rate</th><th data-key="ctr">CTR</th>
+            <th data-key="revenue">Revenue (RM)</th>
+          </tr></thead>
+          <tbody id="cTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    Architect source: Architect Overall Analytics Report, exported 14.07.2026 10:15 · Campaign source: campaign-comparison-report 01.01.2026–14.07.2026 · Asia/Kuala_Lumpur
+  </footer>
+</div>
+
+<script>
+const JOURNEYS = [{"name": "Stagnant Rank", "status": "active", "tags": null, "entered": 349, "completed": 332, "completionRate": 0.9513, "delivered": 529, "clicks": 108, "ctr": 0.2042, "conversions": 1172, "cr": 2.2155, "revenue": 232759.0, "aov": 199.0}, {"name": "Stagnant Rank Silver Gold", "status": "active", "tags": null, "entered": 43, "completed": 42, "completionRate": 0.9767, "delivered": 65, "clicks": 21, "ctr": 0.3231, "conversions": 757, "cr": 11.6462, "revenue": 189114.0, "aov": 250.0}, {"name": "First time Rank Up Achiever", "status": "active", "tags": "Eskayvie Nexus", "entered": 1154, "completed": 981, "completionRate": 0.8501, "delivered": 1830, "clicks": 392, "ctr": 0.2142, "conversions": 251, "cr": 0.1372, "revenue": 105351.0, "aov": 420.0}, {"name": "Welcome Journey Temp 24 May", "status": "active", "tags": null, "entered": 2564, "completed": 2407, "completionRate": 0.9388, "delivered": 10216, "clicks": 472, "ctr": 0.0462, "conversions": 131, "cr": 0.0128, "revenue": 57696.0, "aov": 440.0}, {"name": "Touch Point 3-5 Customers 2025 New - Version 2", "status": "passive", "tags": "Touch Point", "entered": 1136, "completed": 1069, "completionRate": 0.941, "delivered": 4570, "clicks": 326, "ctr": 0.0713, "conversions": 181, "cr": 0.0396, "revenue": 56515.0, "aov": 312.0}, {"name": "Journey Abandon Cart - Version 3", "status": "passive", "tags": null, "entered": 2085, "completed": 1720, "completionRate": 0.8249, "delivered": 6091, "clicks": 79, "ctr": 0.013, "conversions": 200, "cr": 0.0328, "revenue": 48673.0, "aov": 243.0}, {"name": "Touch Point 1 2025 New", "status": "passive", "tags": null, "entered": 17703, "completed": 2443, "completionRate": 0.138, "delivered": 13060, "clicks": 94, "ctr": 0.0072, "conversions": 173, "cr": 0.0132, "revenue": 46926.0, "aov": 271.0}, {"name": "90 Days Onboarding Apprentice Temp", "status": "active", "tags": null, "entered": 669, "completed": 0, "completionRate": 0.0, "delivered": 11976, "clicks": 578, "ctr": 0.0483, "conversions": 99, "cr": 0.0083, "revenue": 42103.0, "aov": 425.0}, {"name": "90 Days Onboarding Apprentice Temp 2", "status": "active", "tags": null, "entered": 516, "completed": 0, "completionRate": 0.0, "delivered": 7182, "clicks": 634, "ctr": 0.0883, "conversions": 73, "cr": 0.0102, "revenue": 39491.0, "aov": 541.0}, {"name": "Touch Point 3-5 Customers 2025 New", "status": "active", "tags": "Touch Point", "entered": 2188, "completed": 1326, "completionRate": 0.606, "delivered": 6665, "clicks": 520, "ctr": 0.078, "conversions": 67, "cr": 0.0101, "revenue": 37189.0, "aov": 555.0}, {"name": "Scan & Win Purchase Manual 3 26 Apr", "status": "active", "tags": "Customer", "entered": 1221, "completed": 61, "completionRate": 0.05, "delivered": 3504, "clicks": 375, "ctr": 0.107, "conversions": 42, "cr": 0.012, "revenue": 17331.0, "aov": 413.0}, {"name": "Scan & Win Purchase Entry Confirm Manual 27 Apr", "status": "passive", "tags": null, "entered": 4794, "completed": 49, "completionRate": 0.0102, "delivered": 9120, "clicks": 1150, "ctr": 0.1261, "conversions": 25, "cr": 0.0027, "revenue": 11318.0, "aov": 453.0}, {"name": "Welcome Journey Temp 31 May", "status": "active", "tags": null, "entered": 601, "completed": 570, "completionRate": 0.9484, "delivered": 2620, "clicks": 124, "ctr": 0.0473, "conversions": 32, "cr": 0.0122, "revenue": 10035.0, "aov": 314.0}, {"name": "First time Rank Up Bronze", "status": "active", "tags": "Eskayvie Nexus", "entered": 78, "completed": 69, "completionRate": 0.8846, "delivered": 125, "clicks": 23, "ctr": 0.184, "conversions": 46, "cr": 0.368, "revenue": 9582.0, "aov": 208.0}, {"name": "90 Days Onboarding Apprentice Temp 3", "status": "active", "tags": null, "entered": 91, "completed": 0, "completionRate": 0.0, "delivered": 1134, "clicks": 175, "ctr": 0.1543, "conversions": 22, "cr": 0.0194, "revenue": 9066.0, "aov": 412.0}, {"name": "Journey Browse Abandon - Version 4", "status": "passive", "tags": null, "entered": 2847, "completed": 2841, "completionRate": 0.9979, "delivered": 7663, "clicks": 314, "ctr": 0.041, "conversions": 28, "cr": 0.0037, "revenue": 8170.0, "aov": 292.0}, {"name": "Promo 1-15 Jul", "status": "active", "tags": null, "entered": 54911, "completed": 54403, "completionRate": 0.9907, "delivered": 56946, "clicks": 2726, "ctr": 0.0479, "conversions": 15, "cr": 0.0003, "revenue": 7927.0, "aov": 528.0}, {"name": "FS 28 - 30 Jun", "status": "passive", "tags": null, "entered": 54931, "completed": 54585, "completionRate": 0.9937, "delivered": 27248, "clicks": 512, "ctr": 0.0188, "conversions": 22, "cr": 0.0008, "revenue": 6795.0, "aov": 309.0}, {"name": "Promo 16-30 Jun", "status": "active", "tags": null, "entered": 55337, "completed": 54875, "completionRate": 0.9917, "delivered": 29867, "clicks": 624, "ctr": 0.0209, "conversions": 18, "cr": 0.0006, "revenue": 6642.0, "aov": 369.0}, {"name": "Scan & Win Final - Email", "status": "passive", "tags": "Scan&Win", "entered": 51097, "completed": 50905, "completionRate": 0.9962, "delivered": 50380, "clicks": 1414, "ctr": 0.0281, "conversions": 16, "cr": 0.0003, "revenue": 6170.0, "aov": 386.0}, {"name": "Active Mindtropic 1x", "status": "active", "tags": "Mindtropic, Mindtropic Jr", "entered": 2205, "completed": 1055, "completionRate": 0.4785, "delivered": 4147, "clicks": 48, "ctr": 0.0116, "conversions": 13, "cr": 0.0031, "revenue": 5663.0, "aov": 436.0}, {"name": "Scan & Win Repeat Purchase", "status": "active", "tags": "Customer, EPC", "entered": 10716, "completed": 10704, "completionRate": 0.9989, "delivered": 7925, "clicks": 144, "ctr": 0.0182, "conversions": 9, "cr": 0.0011, "revenue": 5270.0, "aov": 586.0}, {"name": "Scan & Win Purchase Entry Confirm 9-11 Jun", "status": "passive", "tags": "Customer, EPC", "entered": 1671, "completed": 1615, "completionRate": 0.9665, "delivered": 3070, "clicks": 353, "ctr": 0.115, "conversions": 8, "cr": 0.0026, "revenue": 4140.0, "aov": 518.0}, {"name": "Testimoni Pak Hayat", "status": "active", "tags": null, "entered": 50281, "completed": 49827, "completionRate": 0.991, "delivered": 103955, "clicks": 4076, "ctr": 0.0392, "conversions": 12, "cr": 0.0001, "revenue": 3290.0, "aov": 274.0}, {"name": "Promo 1-15 April", "status": "passive", "tags": null, "entered": 24672, "completed": 24425, "completionRate": 0.99, "delivered": 28170, "clicks": 1215, "ctr": 0.0431, "conversions": 12, "cr": 0.0004, "revenue": 3019.0, "aov": 252.0}, {"name": "Active Mindtropic 1x - Version 1", "status": "passive", "tags": "Mindtropic, Mindtropic Jr", "entered": 3693, "completed": 3350, "completionRate": 0.9071, "delivered": 8252, "clicks": 95, "ctr": 0.0115, "conversions": 6, "cr": 0.0007, "revenue": 2777.0, "aov": 463.0}, {"name": "Winback Journey Mindtropic Diffenz", "status": "passive", "tags": "Customers", "entered": 26581, "completed": 24433, "completionRate": 0.9192, "delivered": 93594, "clicks": 1788, "ctr": 0.0191, "conversions": 4, "cr": 0.0, "revenue": 2664.0, "aov": 666.0}, {"name": "Scan & Win - Purchase Manual 1", "status": "passive", "tags": null, "entered": 673, "completed": 673, "completionRate": 1.0, "delivered": 881, "clicks": 299, "ctr": 0.3394, "conversions": 9, "cr": 0.0102, "revenue": 2587.0, "aov": 287.0}, {"name": "Scan & Win - Entry Confirm Manual 2", "status": "passive", "tags": null, "entered": 933, "completed": 933, "completionRate": 1.0, "delivered": 1025, "clicks": 519, "ctr": 0.5063, "conversions": 6, "cr": 0.0059, "revenue": 2365.0, "aov": 394.0}, {"name": "Welcome Journey 2026 - Version 1", "status": "passive", "tags": null, "entered": 109, "completed": 105, "completionRate": 0.9633, "delivered": 581, "clicks": 19, "ctr": 0.0327, "conversions": 3, "cr": 0.0052, "revenue": 1820.0, "aov": 607.0}, {"name": "Touch Point 3-5 Customers 2025 New - Version 1", "status": "sunset", "tags": "Touch Point", "entered": 273, "completed": 642, "completionRate": 2.3516, "delivered": 1687, "clicks": 127, "ctr": 0.0753, "conversions": 12, "cr": 0.0071, "revenue": 1626.0, "aov": 136.0}, {"name": "Active Mindtropic 2x - Version 1", "status": "passive", "tags": "Mindtropic, Mindtropic Jr", "entered": 614, "completed": 521, "completionRate": 0.8485, "delivered": 1292, "clicks": 3, "ctr": 0.0023, "conversions": 2, "cr": 0.0015, "revenue": 1510.0, "aov": 755.0}, {"name": "Scan & Win - Entry Confirm Manual", "status": "passive", "tags": null, "entered": 851, "completed": 829, "completionRate": 0.9741, "delivered": 1611, "clicks": 467, "ctr": 0.2899, "conversions": 2, "cr": 0.0012, "revenue": 1190.0, "aov": 595.0}, {"name": "Influence Subscribe - 6 Months Subscription", "status": "passive", "tags": null, "entered": 9526, "completed": 9472, "completionRate": 0.9943, "delivered": 81014, "clicks": 1077, "ctr": 0.0133, "conversions": 6, "cr": 0.0001, "revenue": 1053.0, "aov": 176.0}, {"name": "FS 11-12 Jul", "status": "passive", "tags": null, "entered": 27039, "completed": 26884, "completionRate": 0.9943, "delivered": 28653, "clicks": 1317, "ctr": 0.046, "conversions": 2, "cr": 0.0001, "revenue": 960.0, "aov": 480.0}, {"name": "Scan & Win Purchase Entry Confirm 6-7 Jun", "status": "passive", "tags": null, "entered": 507, "completed": 489, "completionRate": 0.9645, "delivered": 873, "clicks": 89, "ctr": 0.1019, "conversions": 2, "cr": 0.0023, "revenue": 890.0, "aov": 445.0}, {"name": "Ramadhan Journey 2", "status": "passive", "tags": null, "entered": 176728, "completed": 176708, "completionRate": 0.9999, "delivered": 159609, "clicks": 2033, "ctr": 0.0127, "conversions": 4, "cr": 0.0, "revenue": 745.0, "aov": 186.0}, {"name": "Purchase Mindtropic Customers 1-7 jun", "status": "passive", "tags": "Customer, EPC", "entered": 901, "completed": 893, "completionRate": 0.9911, "delivered": 1570, "clicks": 31, "ctr": 0.0197, "conversions": 1, "cr": 0.0006, "revenue": 700.0, "aov": 700.0}, {"name": "Promo 1-15 Mac", "status": "passive", "tags": null, "entered": 25872, "completed": 25615, "completionRate": 0.9901, "delivered": 29178, "clicks": 1434, "ctr": 0.0491, "conversions": 3, "cr": 0.0001, "revenue": 698.0, "aov": 233.0}, {"name": "Touch Point 3 to 7 Booster Minda New 2025", "status": "active", "tags": "Booster Minda", "entered": 105, "completed": 13, "completionRate": 0.1238, "delivered": 441, "clicks": 3, "ctr": 0.0068, "conversions": 4, "cr": 0.0091, "revenue": 685.0, "aov": 171.0}, {"name": "Birthday Wish Nexus", "status": "active", "tags": "Eskayvie Nexus", "entered": 3177, "completed": 2609, "completionRate": 0.8212, "delivered": 4872, "clicks": 12, "ctr": 0.0025, "conversions": 1, "cr": 0.0002, "revenue": 610.0, "aov": 610.0}, {"name": "Scan & Win - Purchase Manual 2", "status": "passive", "tags": null, "entered": 418, "completed": 418, "completionRate": 1.0, "delivered": 538, "clicks": 171, "ctr": 0.3178, "conversions": 3, "cr": 0.0056, "revenue": 535.0, "aov": 178.0}, {"name": "Success Story Nexus", "status": "passive", "tags": "Eskayvie Nexus", "entered": 77821, "completed": 77138, "completionRate": 0.9912, "delivered": 210073, "clicks": 2446, "ctr": 0.0116, "conversions": 1, "cr": 0.0, "revenue": 480.0, "aov": 480.0}, {"name": "Active Mindtropic 2x", "status": "active", "tags": "Mindtropic, Mindtropic Jr", "entered": 812, "completed": 293, "completionRate": 0.3608, "delivered": 1481, "clicks": 11, "ctr": 0.0074, "conversions": 1, "cr": 0.0007, "revenue": 350.0, "aov": 350.0}, {"name": "First time Rank Up Silver", "status": "active", "tags": "Eskayvie Nexus", "entered": 7, "completed": 6, "completionRate": 0.8571, "delivered": 10, "clicks": 1, "ctr": 0.1, "conversions": 8, "cr": 0.8, "revenue": 275.0, "aov": 34.0}, {"name": "RM20 Reminder December 1", "status": "passive", "tags": "EPC", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 1, "clicks": 13, "ctr": 13.0, "conversions": 1, "cr": 1.0, "revenue": 130.0, "aov": 130.0}, {"name": "Ramadhan Journey", "status": "passive", "tags": null, "entered": 254307, "completed": 254250, "completionRate": 0.9998, "delivered": 231215, "clicks": 5541, "ctr": 0.024, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Loyalty Points 1 December", "status": "passive", "tags": "EPC", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 86, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Free Sample TTMM 1", "status": "passive", "tags": "TTMM", "entered": 117, "completed": 117, "completionRate": 1.0, "delivered": 325, "clicks": 82, "ctr": 0.2523, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Journey Browse Abandon", "status": "active", "tags": null, "entered": 233, "completed": 222, "completionRate": 0.9528, "delivered": 324, "clicks": 69, "ctr": 0.213, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Free Sample TTMM 2", "status": "passive", "tags": "TTMM", "entered": 47, "completed": 47, "completionRate": 1.0, "delivered": 127, "clicks": 20, "ctr": 0.1575, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Not Active Mindtropic", "status": "active", "tags": "Mindtropic, Mindtropic Jr", "entered": 1738, "completed": 1679, "completionRate": 0.9661, "delivered": 2480, "clicks": 14, "ctr": 0.0056, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Purchase Mindtropic Customers 20-31 May", "status": "passive", "tags": "Customer, EPC", "entered": 1389, "completed": 1376, "completionRate": 0.9906, "delivered": 2143, "clicks": 9, "ctr": 0.0042, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Touch Point 2 New 2608", "status": "passive", "tags": null, "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 8, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Purchase Mindtropic Customers", "status": "passive", "tags": "Customer, EPC", "entered": 6630, "completed": 1796, "completionRate": 0.2709, "delivered": 1446, "clicks": 8, "ctr": 0.0055, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Birthday Voucher December 1", "status": "passive", "tags": "EPC", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 7, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Loyalty Points - Version 1", "status": "passive", "tags": "EPC", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 5, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Cashback Almost 1% December 1", "status": "passive", "tags": "EPC", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 4, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Touch Point 1 New 2608", "status": "passive", "tags": null, "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 3, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Beli & Menang 2025 Inactivity 2025 New", "status": "passive", "tags": null, "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 2, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Journey Abandon Cart", "status": "active", "tags": null, "entered": 106, "completed": 95, "completionRate": 0.8962, "delivered": 148, "clicks": 2, "ctr": 0.0135, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Touch Point 3-5 Customers", "status": "passive", "tags": "Touch Point", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Beli & Menang RM150 Customer HQ - Version 1", "status": "passive", "tags": "Cabutan Bertuah", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Beli Menang Invois Ganda - Version 1 - Version 1", "status": "passive", "tags": "Cabutan Bertuah", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "EPC Birthday Month - Version 1", "status": "passive", "tags": "EPC", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "BM Not Purchase RM150 Feb onwards - Version 2", "status": "passive", "tags": "Cabutan Bertuah", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Beli Menang 2025 (Small Purchase) - Customers", "status": "passive", "tags": "Cabutan Bertuah", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Beli & Menang 2025 Inactivity - Customers", "status": "passive", "tags": null, "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "BM Not Purchase RM150 Feb onwards", "status": "passive", "tags": "Cabutan Bertuah", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "EPC Loyalty Points Balance 2.0 2605", "status": "passive", "tags": "EPC", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Ashwa Reactivation Journey - Version 1", "status": "passive", "tags": null, "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Ashwa Reactivation Journey", "status": "passive", "tags": null, "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "2 Beli & Menang Purchase Threshold", "status": "passive", "tags": "Cabutan Bertuah", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Ashwa Reactivation Journey Copy", "status": "passive", "tags": null, "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Beli & Menang 2025 - Customers", "status": "passive", "tags": "Cabutan Bertuah", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Beli & Menang Agent Alert", "status": "passive", "tags": "Cabutan Bertuah, Eskayvie Nexus", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Touch Point 3 to 7 Booster Minda", "status": "passive", "tags": "Booster Minda", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Touch Point 1 - Booster Minda 2608", "status": "passive", "tags": "Booster Minda", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Touch Point 2 - Booster Minda 2608", "status": "passive", "tags": "Booster Minda", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Leads Booster Minda New 2 2608", "status": "passive", "tags": "Booster Minda", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Touch Point 2 2025 New", "status": "passive", "tags": null, "entered": 277, "completed": 208, "completionRate": 0.7509, "delivered": 380, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Beli & Menang 2025 New - Customers", "status": "passive", "tags": "Cabutan Bertuah", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Beli & Menang Agent Alert New 2025", "status": "passive", "tags": "Cabutan Bertuah, Eskayvie Nexus", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Beli Menang 2025 (Small Purchase) New 2025", "status": "passive", "tags": "Cabutan Bertuah", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Cashback Achieve 1% December", "status": "passive", "tags": "EPC", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Upsell & Crossell Mindtropic & Diffenz", "status": "passive", "tags": null, "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "First time Rank Up Gold", "status": "active", "tags": "Eskayvie Nexus", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "First time Rank Up Sapphire", "status": "active", "tags": "Eskayvie Nexus", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Purchase Mindtropic Customers - Version 1", "status": "passive", "tags": "Customer, EPC", "entered": 485, "completed": 133, "completionRate": 0.2742, "delivered": 100, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Purchase Mindtropic Customers - Version 2", "status": "passive", "tags": "Customer, EPC", "entered": 1091, "completed": 214, "completionRate": 0.1962, "delivered": 149, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Welcome Journey 2026", "status": "active", "tags": null, "entered": 38, "completed": 12, "completionRate": 0.3158, "delivered": 103, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "90 Days Onboarding Apprentice 2026", "status": "active", "tags": null, "entered": 30, "completed": 0, "completionRate": 0.0, "delivered": 4, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Not Active Mindtropic - Version 1", "status": "passive", "tags": "Mindtropic, Mindtropic Jr", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "Active Mindtropic 2x - Version 2", "status": "passive", "tags": "Mindtropic, Mindtropic Jr", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0.0, "conversions": 0, "cr": 0.0, "revenue": 0.0, "aov": 0.0}, {"name": "90 Days Apprentice Journey New", "status": "passive", "tags": "Eskayvie Nexus", "entered": 0, "completed": 0, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0, "conversions": 0, "cr": 0, "revenue": 0, "aov": 0}, {"name": "90 Days Apprentice Journey New 2025", "status": "passive", "tags": "Eskayvie Nexus", "entered": 0, "completed": 578, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0, "conversions": 0, "cr": 0, "revenue": 0, "aov": 0}, {"name": "90 Days Apprentice Journey 11 Users", "status": "passive", "tags": "Eskayvie Nexus", "entered": 0, "completed": 11, "completionRate": 0.0, "delivered": 0, "clicks": 0, "ctr": 0, "conversions": 0, "cr": 0, "revenue": 0, "aov": 0}];
+const CAMPAIGNS = [{"date": "06.01.2026", "iso": "2026-01-06", "name": "Beli Menang Grand - 2 Hari Lagi", "category": "EPC Membership", "sent": 28054, "delivered": 27175, "openRate": 0.251, "ctr": 0.0046, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "07.01.2026", "iso": "2026-01-07", "name": "Booster Minda 4th Content", "category": "Booster Minda (Mindtropic Jr)", "sent": 102108, "delivered": 97870, "openRate": 0.054, "ctr": 0.0016, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "07.01.2026", "iso": "2026-01-07", "name": "Beli Menang Grand - 1 Hari Lagi", "category": "EPC Membership", "sent": 28037, "delivered": 27609, "openRate": 0.2429, "ctr": 0.0037, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "08.01.2026", "iso": "2026-01-08", "name": "Beli Menang Grand Hari Ini Reminder", "category": "EPC Membership", "sent": 26767, "delivered": 26418, "openRate": 0.2471, "ctr": 0.0048, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "08.01.2026", "iso": "2026-01-08", "name": "Beli Menang Grand Hari Ini", "category": "EPC Membership", "sent": 25960, "delivered": 25637, "openRate": 0.2555, "ctr": 0.0043, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "13.01.2026", "iso": "2026-01-13", "name": "Tahniah Grand Finale Beli Menang", "category": "EPC Membership", "sent": 27916, "delivered": 27537, "openRate": 0.3138, "ctr": 0.0053, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "17.01.2026", "iso": "2026-01-17", "name": "SALAM ISRAK MIKRAJ", "category": "Other / Uncategorized", "sent": 47350, "delivered": 46721, "openRate": 0.295, "ctr": 0.0037, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "26.01.2026", "iso": "2026-01-26", "name": "Promo 16 Jan - 31 Jan", "category": "Flash Sale & Promo", "sent": 25896, "delivered": 25603, "openRate": 0.2544, "ctr": 0.006, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "27.01.2026", "iso": "2026-01-27", "name": "New Year 2026", "category": "Customer / Nexus General", "sent": 24532, "delivered": 24256, "openRate": 0.2697, "ctr": 0.0045, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "29.01.2026", "iso": "2026-01-29", "name": "Back to School", "category": "Booster Minda (Mindtropic Jr)", "sent": 105879, "delivered": 102298, "openRate": 0.1102, "ctr": 0.0026, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "31.01.2026", "iso": "2026-01-31", "name": "Booster Minda 5th Content", "category": "Booster Minda (Mindtropic Jr)", "sent": 105768, "delivered": 102172, "openRate": 0.1013, "ctr": 0.002, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "06.02.2026", "iso": "2026-02-06", "name": "Promo 1-10 Feb 2026", "category": "Flash Sale & Promo", "sent": 25688, "delivered": 25375, "openRate": 0.2483, "ctr": 0.0042, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "11.02.2026", "iso": "2026-02-11", "name": "Booster Minda 6th Content", "category": "Booster Minda (Mindtropic Jr)", "sent": 105416, "delivered": 101487, "openRate": 0.0951, "ctr": 0.002, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "12.02.2026", "iso": "2026-02-12", "name": "6 Months Subscription Plan", "category": "Mindtropic / Diffenz Product", "sent": 51150, "delivered": 50097, "openRate": 0.2449, "ctr": 0.004, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "14.02.2026", "iso": "2026-02-14", "name": "Tempoh Keahlian EPC+ Tamat", "category": "EPC Membership", "sent": 166782, "delivered": 159559, "openRate": 0.0507, "ctr": 0.0027, "conversions": 7, "cr": 0.0, "revenue": 1350.0}, {"date": "18.02.2026", "iso": "2026-02-18", "name": "Ramadhan Kareem", "category": "Festive & Seasonal", "sent": 239934, "delivered": 227201, "openRate": 0.0475, "ctr": 0.0019, "conversions": 9, "cr": 0.0, "revenue": 1660.0}, {"date": "18.02.2026", "iso": "2026-02-18", "name": "Lumiea Launching", "category": "Lumiea Launch", "sent": 25749, "delivered": 25392, "openRate": 0.2713, "ctr": 0.0045, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "20.02.2026", "iso": "2026-02-20", "name": "Lumiea Launching Awareness", "category": "Lumiea Launch", "sent": 25986, "delivered": 25630, "openRate": 0.2699, "ctr": 0.0068, "conversions": 3, "cr": 0.0, "revenue": 640.0}, {"date": "24.02.2026", "iso": "2026-02-24", "name": "Promo 21 Feb - 28 Feb", "category": "Flash Sale & Promo", "sent": 25878, "delivered": 25513, "openRate": 0.2587, "ctr": 0.0045, "conversions": 1, "cr": 0.0, "revenue": 91.0}, {"date": "28.02.2026", "iso": "2026-02-28", "name": "Lumiea Awareness Feedback", "category": "Lumiea Launch", "sent": 25904, "delivered": 25512, "openRate": 0.2647, "ctr": 0.0047, "conversions": 1, "cr": 0.0, "revenue": 130.0}, {"date": "02.03.2026", "iso": "2026-03-02", "name": "Booster Minda 7th Content", "category": "Booster Minda (Mindtropic Jr)", "sent": 105711, "delivered": 101760, "openRate": 0.1145, "ctr": 0.0027, "conversions": 1, "cr": 0.0, "revenue": 130.0}, {"date": "06.03.2026", "iso": "2026-03-06", "name": "Booster Minda 9th Content", "category": "Booster Minda (Mindtropic Jr)", "sent": 15384, "delivered": 15109, "openRate": 0.2494, "ctr": 0.0032, "conversions": 1, "cr": 0.0, "revenue": 288.0}, {"date": "13.03.2026", "iso": "2026-03-13", "name": "Ramadhan 3", "category": "Festive & Seasonal", "sent": 25176, "delivered": 24796, "openRate": 0.2695, "ctr": 0.0054, "conversions": 1, "cr": 0.0, "revenue": 285.0}, {"date": "14.03.2026", "iso": "2026-03-14", "name": "Booster Minda 10th Content", "category": "Booster Minda (Mindtropic Jr)", "sent": 15420, "delivered": 15143, "openRate": 0.2342, "ctr": 0.0032, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "15.03.2026", "iso": "2026-03-15", "name": "Launching New Formulation Mt", "category": "Other / Uncategorized", "sent": 33355, "delivered": 31796, "openRate": 0.065, "ctr": 0.0022, "conversions": 3, "cr": 0.0, "revenue": 945.0}, {"date": "16.03.2026", "iso": "2026-03-16", "name": "Ramadhan 4", "category": "Festive & Seasonal", "sent": 25409, "delivered": 25017, "openRate": 0.291, "ctr": 0.006, "conversions": 1, "cr": 0.0, "revenue": 125.0}, {"date": "16.03.2026", "iso": "2026-03-16", "name": "LIVE Launching Mindtropic & Mindtropic Junior", "category": "Mindtropic / Diffenz Product", "sent": 33339, "delivered": 31659, "openRate": 0.0645, "ctr": 0.0021, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "19.03.2026", "iso": "2026-03-19", "name": "Video Raya", "category": "Festive & Seasonal", "sent": 42414, "delivered": 41761, "openRate": 0.3214, "ctr": 0.0052, "conversions": 7, "cr": 0.0, "revenue": 1533.0}, {"date": "20.03.2026", "iso": "2026-03-20", "name": "Transition Mindtropic", "category": "Mindtropic / Diffenz Product", "sent": 31702, "delivered": 30151, "openRate": 0.0546, "ctr": 0.0021, "conversions": 1, "cr": 0.0, "revenue": 280.0}, {"date": "21.03.2026", "iso": "2026-03-21", "name": "Salam Lebaran", "category": "Festive & Seasonal", "sent": 34448, "delivered": 33942, "openRate": 0.3104, "ctr": 0.0053, "conversions": 5, "cr": 0.0, "revenue": 985.0}, {"date": "21.03.2026", "iso": "2026-03-21", "name": "FS 20-23 Mac", "category": "Flash Sale & Promo", "sent": 11526, "delivered": 11327, "openRate": 0.2495, "ctr": 0.0034, "conversions": 1, "cr": 0.0, "revenue": 66.0}, {"date": "23.03.2026", "iso": "2026-03-23", "name": "SPAA", "category": "SPAA (Parenting Series)", "sent": 33319, "delivered": 31683, "openRate": 0.0598, "ctr": 0.0015, "conversions": 2, "cr": 0.0, "revenue": 475.0}, {"date": "25.03.2026", "iso": "2026-03-25", "name": "Owi", "category": "SPAA (Parenting Series)", "sent": 33312, "delivered": 31600, "openRate": 0.0691, "ctr": 0.0023, "conversions": 3, "cr": 0.0, "revenue": 520.0}, {"date": "29.03.2026", "iso": "2026-03-29", "name": "MAPCEM", "category": "Mindtropic / Diffenz Product", "sent": 8107, "delivered": 7698, "openRate": 0.089, "ctr": 0.0095, "conversions": 14, "cr": 0.0, "revenue": 3606.0}, {"date": "05.04.2026", "iso": "2026-04-05", "name": "Scan & Win 2026", "category": "Scan & Win", "sent": 21676, "delivered": 20898, "openRate": 0.1692, "ctr": 0.005, "conversions": 4, "cr": 0.0, "revenue": 830.0}, {"date": "05.04.2026", "iso": "2026-04-05", "name": "Scan & Win 2026", "category": "Scan & Win", "sent": 21636, "delivered": 20864, "openRate": 0.1559, "ctr": 0.0041, "conversions": 4, "cr": 0.0, "revenue": 945.0}, {"date": "12.04.2026", "iso": "2026-04-12", "name": "FS 10-12", "category": "Flash Sale & Promo", "sent": 43201, "delivered": 41668, "openRate": 0.1631, "ctr": 0.0043, "conversions": 8, "cr": 0.0, "revenue": 1840.0}, {"date": "14.04.2026", "iso": "2026-04-14", "name": "MAPCEM Event", "category": "MAPCEM Event", "sent": 33249, "delivered": 31354, "openRate": 0.076, "ctr": 0.0028, "conversions": 46, "cr": 0.0, "revenue": 3299.0}, {"date": "15.04.2026", "iso": "2026-04-15", "name": "MAPCEM Kronologi", "category": "MAPCEM Event", "sent": 33258, "delivered": 31606, "openRate": 0.0704, "ctr": 0.0027, "conversions": 15, "cr": 0.0, "revenue": 2732.0}, {"date": "15.04.2026", "iso": "2026-04-15", "name": "Scan and Win Purchase 1", "category": "Scan & Win", "sent": 308, "delivered": 296, "openRate": 0.1115, "ctr": 0.0101, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "17.04.2026", "iso": "2026-04-17", "name": "FS 16-30 April", "category": "Flash Sale & Promo", "sent": 42562, "delivered": 41063, "openRate": 0.1612, "ctr": 0.0039, "conversions": 6, "cr": 0.0, "revenue": 1235.0}, {"date": "19.04.2026", "iso": "2026-04-19", "name": "SPAA 2", "category": "SPAA (Parenting Series)", "sent": 26565, "delivered": 25225, "openRate": 0.0699, "ctr": 0.0026, "conversions": 16, "cr": 0.0, "revenue": 3892.0}, {"date": "21.04.2026", "iso": "2026-04-21", "name": "SPAA 1", "category": "SPAA (Parenting Series)", "sent": 26577, "delivered": 25264, "openRate": 0.0728, "ctr": 0.0037, "conversions": 14, "cr": 0.0, "revenue": 3730.0}, {"date": "26.04.2026", "iso": "2026-04-26", "name": "Weekly Announcement", "category": "Scan & Win", "sent": 26621, "delivered": 25286, "openRate": 0.0805, "ctr": 0.0072, "conversions": 16, "cr": 0.0, "revenue": 3251.0}, {"date": "28.04.2026", "iso": "2026-04-28", "name": "FS 27-28 April", "category": "Flash Sale & Promo", "sent": 4379, "delivered": 4181, "openRate": 0.0761, "ctr": 0.0019, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "28.04.2026", "iso": "2026-04-28", "name": "Talk To My Manager", "category": "Talk To My Manager (TV Tie-in)", "sent": 71164, "delivered": 68852, "openRate": 0.2277, "ctr": 0.0039, "conversions": 17, "cr": 0.0, "revenue": 5190.5}, {"date": "29.04.2026", "iso": "2026-04-29", "name": "Scan & Win - Pemenang Sony Head Phone", "category": "Scan & Win", "sent": 30190, "delivered": 28784, "openRate": 0.1122, "ctr": 0.0107, "conversions": 13, "cr": 0.0, "revenue": 2547.0}, {"date": "30.04.2026", "iso": "2026-04-30", "name": "Scan & Win - Samsung Galaxy S25 FE", "category": "Scan & Win", "sent": 30432, "delivered": 29040, "openRate": 0.098, "ctr": 0.0071, "conversions": 10, "cr": 0.0, "revenue": 2637.0}, {"date": "03.05.2026", "iso": "2026-05-03", "name": "Weekly Announcement 3", "category": "Scan & Win", "sent": 24952, "delivered": 23732, "openRate": 0.0944, "ctr": 0.0073, "conversions": 3, "cr": 0.0, "revenue": 660.0}, {"date": "05.05.2026", "iso": "2026-05-05", "name": "Promo 1-15 April", "category": "Flash Sale & Promo", "sent": 24020, "delivered": 23651, "openRate": 0.2993, "ctr": 0.0051, "conversions": 2, "cr": 0.0, "revenue": 530.0}, {"date": "06.05.2026", "iso": "2026-05-06", "name": "SPAA 3", "category": "SPAA (Parenting Series)", "sent": 22774, "delivered": 21606, "openRate": 0.0775, "ctr": 0.003, "conversions": 6, "cr": 0.0, "revenue": 1470.0}, {"date": "06.05.2026", "iso": "2026-05-06", "name": "Scan & Win - Pemenang Samsung FE25", "category": "Scan & Win", "sent": 28005, "delivered": 26675, "openRate": 0.2258, "ctr": 0.0208, "conversions": 10, "cr": 0.0, "revenue": 2600.0}, {"date": "07.05.2026", "iso": "2026-05-07", "name": "Scan & Win - Sony Camera", "category": "Scan & Win", "sent": 29822, "delivered": 28447, "openRate": 0.139, "ctr": 0.0058, "conversions": 12, "cr": 0.0, "revenue": 2880.0}, {"date": "09.05.2026", "iso": "2026-05-09", "name": "Talk To My Manager Week 3", "category": "Talk To My Manager (TV Tie-in)", "sent": 71095, "delivered": 68883, "openRate": 0.2917, "ctr": 0.0039, "conversions": 6, "cr": 0.0, "revenue": 455.0}, {"date": "10.05.2026", "iso": "2026-05-10", "name": "Weekly Announcement 3 Copy", "category": "Scan & Win", "sent": 25041, "delivered": 23846, "openRate": 0.1048, "ctr": 0.0068, "conversions": 17, "cr": 0.0, "revenue": 3651.0}, {"date": "11.05.2026", "iso": "2026-05-11", "name": "SPAA 4", "category": "SPAA (Parenting Series)", "sent": 25034, "delivered": 23827, "openRate": 0.1187, "ctr": 0.0035, "conversions": 5, "cr": 0.0, "revenue": 820.0}, {"date": "12.05.2026", "iso": "2026-05-12", "name": "Scan & Win - Pemenang Sony Camera", "category": "Scan & Win", "sent": 30598, "delivered": 29218, "openRate": 0.2289, "ctr": 0.0122, "conversions": 8, "cr": 0.0, "revenue": 1635.0}, {"date": "13.05.2026", "iso": "2026-05-13", "name": "Promo Hari Ibu", "category": "Flash Sale & Promo", "sent": 26791, "delivered": 26403, "openRate": 0.2982, "ctr": 0.0048, "conversions": 6, "cr": 0.0, "revenue": 1075.0}, {"date": "15.05.2026", "iso": "2026-05-15", "name": "SPAA 5", "category": "SPAA (Parenting Series)", "sent": 25086, "delivered": 23893, "openRate": 0.0896, "ctr": 0.0026, "conversions": 4, "cr": 0.0, "revenue": 620.0}, {"date": "16.05.2026", "iso": "2026-05-16", "name": "Scan & Win - PS5", "category": "Scan & Win", "sent": 30042, "delivered": 28689, "openRate": 0.1681, "ctr": 0.0097, "conversions": 11, "cr": 0.0, "revenue": 2285.0}, {"date": "16.05.2026", "iso": "2026-05-16", "name": "Promo Hari Ibu Extend", "category": "Flash Sale & Promo", "sent": 26911, "delivered": 26503, "openRate": 0.3062, "ctr": 0.0038, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "17.05.2026", "iso": "2026-05-17", "name": "Weekly Announcement 5", "category": "Scan & Win", "sent": 25105, "delivered": 23913, "openRate": 0.1242, "ctr": 0.0079, "conversions": 10, "cr": 0.0, "revenue": 2897.5}, {"date": "18.05.2026", "iso": "2026-05-18", "name": "Scan & Win - Pemenang PS5", "category": "Scan & Win", "sent": 30612, "delivered": 29059, "openRate": 0.2286, "ctr": 0.0117, "conversions": 13, "cr": 0.0, "revenue": 3265.0}, {"date": "19.05.2026", "iso": "2026-05-19", "name": "Promo Mei Extend", "category": "Flash Sale & Promo", "sent": 27235, "delivered": 24180, "openRate": 0.1966, "ctr": 0.0039, "conversions": 1, "cr": 0.0, "revenue": 175.0}, {"date": "20.05.2026", "iso": "2026-05-20", "name": "Promo Anniversary", "category": "Flash Sale & Promo", "sent": 27283, "delivered": 19512, "openRate": 0.1568, "ctr": 0.0041, "conversions": 1, "cr": 0.0, "revenue": 350.0}, {"date": "22.05.2026", "iso": "2026-05-22", "name": "SPAA 6", "category": "SPAA (Parenting Series)", "sent": 22089, "delivered": 14037, "openRate": 0.0221, "ctr": 0.0009, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "22.05.2026", "iso": "2026-05-22", "name": "Talk To My Manager Week 5", "category": "Talk To My Manager (TV Tie-in)", "sent": 64345, "delivered": 34674, "openRate": 0.0984, "ctr": 0.0029, "conversions": 1, "cr": 0.0, "revenue": 0.0}, {"date": "23.05.2026", "iso": "2026-05-23", "name": "Scan & Win - Dji Osmo", "category": "Scan & Win", "sent": 27338, "delivered": 14413, "openRate": 0.0337, "ctr": 0.0024, "conversions": 2, "cr": 0.0, "revenue": 0.0}, {"date": "24.05.2026", "iso": "2026-05-24", "name": "Promo Diffenz Junior Clearance", "category": "Mindtropic / Diffenz Product", "sent": 38772, "delivered": 22440, "openRate": 0.1299, "ctr": 0.0036, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "25.05.2026", "iso": "2026-05-25", "name": "Scan & Win - Pemenang DJI Osmo", "category": "Scan & Win", "sent": 32652, "delivered": 19999, "openRate": 0.0481, "ctr": 0.0042, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "27.05.2026", "iso": "2026-05-27", "name": "Scan & Win - Ipad Pro", "category": "Scan & Win", "sent": 32631, "delivered": 18938, "openRate": 0.0353, "ctr": 0.0021, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "28.05.2026", "iso": "2026-05-28", "name": "Talk To My Manager Week 6", "category": "Talk To My Manager (TV Tie-in)", "sent": 72580, "delivered": 38678, "openRate": 0.0988, "ctr": 0.0029, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "31.05.2026", "iso": "2026-05-31", "name": "Weekly Announcement 7", "category": "Scan & Win", "sent": 26679, "delivered": 15532, "openRate": 0.0426, "ctr": 0.0033, "conversions": 1, "cr": 0.0, "revenue": 355.0}, {"date": "01.06.2026", "iso": "2026-06-01", "name": "Scan & Win - Pemenang iPad Pro", "category": "Scan & Win", "sent": 32652, "delivered": 18818, "openRate": 0.0528, "ctr": 0.0041, "conversions": 5, "cr": 0.0, "revenue": 1225.0}, {"date": "02.06.2026", "iso": "2026-06-02", "name": "Promo Jun", "category": "Flash Sale & Promo", "sent": 27699, "delivered": 18429, "openRate": 0.114, "ctr": 0.0033, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "03.06.2026", "iso": "2026-06-03", "name": "Scan & Win - Gold Bracelet", "category": "Scan & Win", "sent": 33298, "delivered": 18086, "openRate": 0.045, "ctr": 0.0029, "conversions": 2, "cr": 0.0, "revenue": 525.0}, {"date": "05.06.2026", "iso": "2026-06-05", "name": "Talk To My Manager Week 7", "category": "Talk To My Manager (TV Tie-in)", "sent": 73237, "delivered": 38968, "openRate": 0.1007, "ctr": 0.0031, "conversions": 1, "cr": 0.0, "revenue": 175.0}, {"date": "07.06.2026", "iso": "2026-06-07", "name": "Weekly Announcement 8", "category": "Scan & Win", "sent": 27927, "delivered": 15493, "openRate": 0.0429, "ctr": 0.0045, "conversions": 3, "cr": 0.0, "revenue": 675.0}, {"date": "08.06.2026", "iso": "2026-06-08", "name": "SPAA 7", "category": "SPAA (Parenting Series)", "sent": 27876, "delivered": 16176, "openRate": 0.0309, "ctr": 0.0016, "conversions": 2, "cr": 0.0, "revenue": 700.0}, {"date": "09.06.2026", "iso": "2026-06-09", "name": "Scan & Win - Pemenang Gold Bracelet", "category": "Scan & Win", "sent": 33328, "delivered": 19162, "openRate": 0.0548, "ctr": 0.0044, "conversions": 4, "cr": 0.0, "revenue": 1681.0}, {"date": "10.06.2026", "iso": "2026-06-10", "name": "Scan & Win - Iphone 17 PM", "category": "Scan & Win", "sent": 33717, "delivered": 20599, "openRate": 0.0395, "ctr": 0.003, "conversions": 6, "cr": 0.0, "revenue": 1050.0}, {"date": "12.06.2026", "iso": "2026-06-12", "name": "Talk To My Manager Week 8", "category": "Talk To My Manager (TV Tie-in)", "sent": 73592, "delivered": 41487, "openRate": 0.1032, "ctr": 0.0031, "conversions": 3, "cr": 0.0, "revenue": 885.0}, {"date": "14.06.2026", "iso": "2026-06-14", "name": "Weekly Announcement 9", "category": "Scan & Win", "sent": 28083, "delivered": 14099, "openRate": 0.0428, "ctr": 0.0042, "conversions": 1, "cr": 0.0, "revenue": 525.0}, {"date": "15.06.2026", "iso": "2026-06-15", "name": "Scan & Win - Pemenang iPhone 17", "category": "Scan & Win", "sent": 34152, "delivered": 18847, "openRate": 0.0566, "ctr": 0.0049, "conversions": 3, "cr": 0.0, "revenue": 1322.5}, {"date": "17.06.2026", "iso": "2026-06-17", "name": "Scan & Win - 3 finalis", "category": "Scan & Win", "sent": 51863, "delivered": 30130, "openRate": 0.0945, "ctr": 0.0059, "conversions": 0, "cr": 0.0, "revenue": 0.0}, {"date": "19.06.2026", "iso": "2026-06-19", "name": "Talk To My Manager Week 9", "category": "Talk To My Manager (TV Tie-in)", "sent": 74735, "delivered": 38760, "openRate": 0.1104, "ctr": 0.003, "conversions": 1, "cr": 0.0, "revenue": 350.0}, {"date": "21.06.2026", "iso": "2026-06-21", "name": "Scan & Win - Finalist", "category": "Scan & Win", "sent": 66676, "delivered": 33905, "openRate": 0.0884, "ctr": 0.0023, "conversions": 1, "cr": 0.0, "revenue": 350.0}, {"date": "24.06.2026", "iso": "2026-06-24", "name": "Diffenz New", "category": "Mindtropic / Diffenz Product", "sent": 26818, "delivered": 16834, "openRate": 0.1323, "ctr": 0.0034, "conversions": 2, "cr": 0.0, "revenue": 715.0}, {"date": "27.06.2026", "iso": "2026-06-27", "name": "Scan & Win PR", "category": "Scan & Win", "sent": 72213, "delivered": 38689, "openRate": 0.0848, "ctr": 0.0022, "conversions": 1, "cr": 0.0, "revenue": 700.0}, {"date": "28.06.2026", "iso": "2026-06-28", "name": "Talk To My Manager Week 10", "category": "Talk To My Manager (TV Tie-in)", "sent": 77754, "delivered": 39672, "openRate": 0.1015, "ctr": 0.0016, "conversions": 1, "cr": 0.0, "revenue": 350.0}, {"date": "02.07.2026", "iso": "2026-07-02", "name": "SPAA 8", "category": "SPAA (Parenting Series)", "sent": 28967, "delivered": 27589, "openRate": 0.0977, "ctr": 0.0041, "conversions": 9, "cr": 0.0, "revenue": 2115.0}, {"date": "04.07.2026", "iso": "2026-07-04", "name": "Eskayvie Mobile App", "category": "App Launch", "sent": 45368, "delivered": 44641, "openRate": 0.3471, "ctr": 0.0071, "conversions": 14, "cr": 0.0, "revenue": 4364.5}, {"date": "06.07.2026", "iso": "2026-07-06", "name": "Testimoni pak hayat 1", "category": "Customer / Nexus General", "sent": 50580, "delivered": 49213, "openRate": 0.2149, "ctr": 0.0058, "conversions": 10, "cr": 0.0, "revenue": 1570.0}, {"date": "13.07.2026", "iso": "2026-07-13", "name": "Trial SPM", "category": "SPAA (Parenting Series)", "sent": 29056, "delivered": 27648, "openRate": 0.0603, "ctr": 0.0025, "conversions": 1, "cr": 0.0, "revenue": 350.0}];
+
+const fmtNum = n => n.toLocaleString('en-US');
+const fmtPct = n => (n*100).toFixed(2) + '%';
+const fmtMoney = n => 'RM ' + Math.round(n).toLocaleString('en-US');
+
+const PURPLE='#7C3AED', ORANGE='#F5A623', GREEN='#16A34A', RED='#E53E3E', BLUE='#3B82F6', GREY='#9CA3AF';
+
+/* ---------------- TABS ---------------- */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('on'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('on'));
+    btn.classList.add('on');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('on');
+  });
+});
+
+function kpiCard(topColor, label, value, sub, breakdown, alert){
+  const bd = breakdown ? `<div class="kpi-breakdown">${breakdown.map(b=>`<div>${b.k}<b>${b.v}</b></div>`).join('')}</div>` : '';
+  return `<div class="kpi-card"><div class="kpi-top" style="background:${topColor};"></div>
+    <div class="kpi-body"><div class="kpi-label">${label}</div>
+    <div class="kpi-value ${alert?'alert':''}">${value}</div>
+    <div class="kpi-sub">${sub}</div>${bd}</div></div>`;
+}
+
+/* ================= OVERVIEW ================= */
+const ARCH_REV=994884, CAMP_REV=90589, TOTAL_REV=ARCH_REV+CAMP_REV;
+document.getElementById('kpiOverview').innerHTML = [
+  kpiCard(PURPLE, 'Total CRM Revenue', fmtMoney(TOTAL_REV), 'Architect + Campaigns · YTD',
+    [{k:'ARCHITECT',v:'RM 994.9k'},{k:'CAMPAIGNS',v:'RM 90.6k'}]),
+  kpiCard(GREEN, 'Architect Share', (ARCH_REV/TOTAL_REV*100).toFixed(1)+'%', 'of total CRM revenue'),
+  kpiCard(ORANGE, 'Campaigns Sent', '94', '1 Jan – 14 Jul 2026 · 13 categories'),
+  kpiCard(BLUE, 'Best Blast Category', 'Scan & Win', 'RM 38,492 · 28 sends'),
+].join('');
+
+new Chart(document.getElementById('splitChart'), {
+  type:'doughnut',
+  data:{ labels:['Architect (Journeys)','Campaigns (Blast)'], datasets:[{ data:[ARCH_REV,CAMP_REV],
+    backgroundColor:[PURPLE, GREEN], borderColor:'#FFFFFF', borderWidth:3 }] },
+  options:{ plugins:{ legend:{ position:'bottom', labels:{ color:'#111827', font:{family:'Arial'} } } } }
+});
+
+/* ================= ARCHITECT ================= */
+const KPI = { totalRevenue:994884, totalConversions:3505, conversionRate:0.0028, aov:284, entered:966988,
+  completeRate:0.9608, delivered:1264238, sent:1443590, deliveryRate:0.8758, totalClicks:34312,
+  activeJourneys:27, passiveJourneys:69, sunsetJourneys:1 };
+
+document.getElementById('kpiArchitect').innerHTML = [
+  kpiCard(PURPLE, 'Total Revenue', fmtMoney(KPI.totalRevenue), 'Purchase goal · YTD',
+    [{k:'WHATSAPP',v:'RM 831.7k'},{k:'EMAIL',v:'RM 131.0k'},{k:'WEB PUSH',v:'RM 32.2k'}]),
+  kpiCard(GREEN, 'Conversions', fmtNum(KPI.totalConversions), fmtPct(KPI.conversionRate)+' of delivered'),
+  kpiCard(ORANGE, 'Avg. Order Value', 'RM '+KPI.aov, 'per conversion'),
+  kpiCard(BLUE, 'Active Journeys', KPI.activeJourneys+' / 97', KPI.passiveJourneys+' passive · '+KPI.sunsetJourneys+' sunset'),
+].join('');
+
+const riverSteps = [
+  {label:'Entered', value:KPI.entered, color:'#DCD3F9'}, {label:'Sent', value:KPI.sent, color:'#C4B5F5'},
+  {label:'Delivered', value:KPI.delivered, color:'#A78BEF'}, {label:'Clicked', value:KPI.totalClicks, color:'#8F63EA'},
+  {label:'Converted', value:KPI.totalConversions, color:PURPLE},
+];
+document.getElementById('riverBox').innerHTML = riverSteps.map(s=>{
+  const pct = s.value/riverSteps[0].value; const widthPct = Math.max(pct*100,1.2);
+  return `<div style="display:flex; align-items:center; margin-bottom:14px; gap:16px;">
+    <div style="width:110px; flex-shrink:0; font-size:13px; color:var(--text-muted); font-weight:600;">${s.label}</div>
+    <div style="flex:1; background:#F1F2F5; border-radius:6px; height:32px; position:relative; overflow:hidden;">
+      <div style="height:100%; border-radius:6px; width:${widthPct}%; background:${s.color}; display:flex; align-items:center; justify-content:flex-end; padding-right:12px; font-size:12.5px; font-weight:800; color:#111827;">${fmtNum(s.value)}</div>
+    </div>
+    <div style="width:60px; text-align:right; font-size:12.5px; color:var(--text-dim); font-weight:700;">${(pct*100).toFixed(2)}%</div>
+  </div>`;
+}).join('');
+
+const CHANNELS = [
+  {name:'WhatsApp', sent:78623, deliveryRate:0.9027, cr:0.0415, revenue:831714, color:PURPLE},
+  {name:'Email', sent:1360089, deliveryRate:0.8751, cr:0.0004, revenue:130971, color:GREEN},
+  {name:'Web Push', sent:4878, deliveryRate:0.6296, cr:0.041, revenue:32199, color:ORANGE},
+  {name:'Call an API', sent:null, deliveryRate:null, cr:null, revenue:0, color:GREY},
+  {name:'On-Site', sent:null, deliveryRate:null, cr:0, revenue:0, color:GREY},
+  {name:'SMS', sent:0, deliveryRate:0, cr:0, revenue:0, color:GREY},
+];
+new Chart(document.getElementById('channelChart'), {
+  type:'bar',
+  data:{ labels: CHANNELS.map(c=>c.name),
+    datasets:[
+      {label:'Revenue (RM)', data:CHANNELS.map(c=>c.revenue), backgroundColor:PURPLE, yAxisID:'y', order:2, borderRadius:4},
+      {type:'line', label:'Conversion Rate', data:CHANNELS.map(c=>(c.cr||0)*100), borderColor:RED, backgroundColor:RED, yAxisID:'y1', order:1, tension:.3, pointRadius:4}
+    ]},
+  options:{ responsive:true, plugins:{ legend:{ labels:{ color:'#111827', font:{family:'Arial'} } } },
+    scales:{ x:{ ticks:{ color:'#6B7280', font:{family:'Arial',size:11} }, grid:{display:false} },
+      y:{ ticks:{ color:'#6B7280', callback:v=>'RM'+(v/1000)+'k' }, grid:{color:'#F1F2F5'} },
+      y1:{ position:'right', ticks:{ color:RED, callback:v=>v+'%' }, grid:{display:false} } } }
+});
+document.getElementById('channelTable').innerHTML = `<thead><tr><th>Channel</th><th class="num">Sent</th><th class="num">Deliv. Rate</th><th class="num">Conv. Rate</th><th class="num">Revenue</th></tr></thead><tbody>
+  ${CHANNELS.map(c=>`<tr><td>${c.name}</td>
+    <td class="num">${c.sent!==null?fmtNum(c.sent):'—'}</td><td class="num">${c.deliveryRate!==null?fmtPct(c.deliveryRate):'—'}</td>
+    <td class="num">${c.cr!==null?fmtPct(c.cr):'—'}</td><td class="num">${fmtMoney(c.revenue)}</td></tr>`).join('')}</tbody>`;
+
+const top10j = [...JOURNEYS].sort((a,b)=>b.revenue-a.revenue).slice(0,10);
+new Chart(document.getElementById('leaderChart'), {
+  type:'bar',
+  data:{ labels: top10j.map(j=>j.name), datasets:[{ label:'Revenue (RM)', data: top10j.map(j=>j.revenue),
+    backgroundColor: top10j.map(j=>(j.cr>1)?RED:PURPLE), borderRadius:5 }] },
+  options:{ indexAxis:'y', plugins:{ legend:{ display:false } },
+    scales:{ x:{ ticks:{ color:'#6B7280', callback:v=>'RM'+(v/1000)+'k' }, grid:{color:'#F1F2F5'} },
+      y:{ ticks:{ color:'#111827', font:{family:'Arial',size:12} }, grid:{display:false} } } }
+});
+
+let jSortKey='revenue', jSortDir=-1, jStatusFilter='all', jSearch='';
+function renderJourneyTable(){
+  let rows = JOURNEYS.filter(j=> jStatusFilter==='all' || j.status===jStatusFilter);
+  if(jSearch){ const s=jSearch.toLowerCase(); rows = rows.filter(j=>j.name.toLowerCase().includes(s)); }
+  rows.sort((a,b)=> (a[jSortKey]>b[jSortKey]?1:-1)*jSortDir);
+  document.getElementById('jTableBody').innerHTML = rows.map(j=>`<tr>
+    <td>${j.name}</td><td><span class="status-pill ${j.status}">${j.status}</span></td><td>${fmtNum(j.entered)}</td>
+    <td>${j.cr>1?'<span class="flag">'+fmtPct(j.cr)+' ⚠</span>':fmtPct(j.cr)}</td><td>${fmtNum(j.conversions)}</td>
+    <td>${fmtMoney(j.revenue)}</td><td>${j.aov?Math.round(j.aov):'—'}</td></tr>`).join('');
+}
+renderJourneyTable();
+document.querySelectorAll('#tab-architect table.main thead th[data-key]').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const key = th.dataset.key;
+    if(jSortKey===key){ jSortDir*=-1; } else { jSortKey=key; jSortDir=-1; }
+    document.querySelectorAll('#tab-architect table.main thead th').forEach(t=>t.classList.remove('activecol'));
+    th.classList.add('activecol'); renderJourneyTable();
+  });
+});
+document.getElementById('jSearchBox').addEventListener('input', e=>{ jSearch=e.target.value; renderJourneyTable(); });
+document.getElementById('jStatusFilters').addEventListener('click', e=>{
+  const btn = e.target.closest('.f-btn'); if(!btn) return;
+  document.querySelectorAll('#jStatusFilters .f-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); jStatusFilter = btn.dataset.status; renderJourneyTable();
+});
+
+/* ================= CAMPAIGNS ================= */
+const totalCampSent = CAMPAIGNS.reduce((a,c)=>a+c.sent,0);
+const totalCampRev = CAMPAIGNS.reduce((a,c)=>a+c.revenue,0);
+const totalCampConv = CAMPAIGNS.reduce((a,c)=>a+c.conversions,0);
+const avgOpen = CAMPAIGNS.reduce((a,c)=>a+c.openRate*c.sent,0)/totalCampSent;
+const avgCtr = CAMPAIGNS.reduce((a,c)=>a+c.ctr*c.sent,0)/totalCampSent;
+
+document.getElementById('kpiCampaigns').innerHTML = [
+  kpiCard(PURPLE, 'Total Revenue', fmtMoney(totalCampRev), '94 campaigns'),
+  kpiCard(GREEN, 'Avg. Open Rate', fmtPct(avgOpen), 'sent-weighted'),
+  kpiCard(ORANGE, 'Avg. CTR', fmtPct(avgCtr), 'sent-weighted'),
+  kpiCard(BLUE, 'Conversions', fmtNum(totalCampConv), 'attributed purchases · 13 categories'),
+].join('');
+
+const catAgg = {};
+CAMPAIGNS.forEach(c=>{
+  if(!catAgg[c.category]) catAgg[c.category] = {count:0, sent:0, revenue:0};
+  catAgg[c.category].count++; catAgg[c.category].sent += c.sent; catAgg[c.category].revenue += c.revenue;
+});
+const catEntries = Object.entries(catAgg).sort((a,b)=>b[1].revenue-a[1].revenue);
+
+new Chart(document.getElementById('catChart'), {
+  type:'bar',
+  data:{ labels: catEntries.map(e=>e[0]+' ('+e[1].count+')'),
+    datasets:[{ label:'Revenue (RM)', data: catEntries.map(e=>e[1].revenue), backgroundColor:PURPLE, borderRadius:5 }] },
+  options:{ indexAxis:'y', plugins:{ legend:{ display:false } },
+    scales:{ x:{ ticks:{ color:'#6B7280', callback:v=>'RM'+(v/1000).toFixed(1)+'k' }, grid:{color:'#F1F2F5'} },
+      y:{ ticks:{ color:'#111827', font:{family:'Arial',size:11.5} }, grid:{display:false} } } }
+});
+
+document.getElementById('cCatFilters').innerHTML = ['all', ...catEntries.map(e=>e[0])].map(cat=>
+  `<div class="f-btn ${cat==='all'?'on':''}" data-cat="${cat}">${cat==='all' ? 'ALL · '+CAMPAIGNS.length : cat+' · '+catAgg[cat].count}</div>`
+).join('');
+
+let cSortKey='date', cSortDir=1, cCatFilter='all', cSearch='';
+function renderCampaignTable(){
+  let rows = CAMPAIGNS.filter(c=> cCatFilter==='all' || c.category===cCatFilter);
+  if(cSearch){ const s=cSearch.toLowerCase(); rows = rows.filter(c=>c.name.toLowerCase().includes(s)); }
+  rows.sort((a,b)=>{
+    let av=a[cSortKey], bv=b[cSortKey];
+    if(cSortKey==='date'){ av=a.iso; bv=b.iso; }
+    return (av>bv?1:-1)*cSortDir;
+  });
+  document.getElementById('cTableBody').innerHTML = rows.map(c=>`<tr>
+    <td>${c.date}</td><td>${c.name}</td><td><span class="cat-tag">${c.category}</span></td>
+    <td>${fmtNum(c.sent)}</td><td>${fmtPct(c.openRate)}</td><td>${fmtPct(c.ctr)}</td><td>${fmtMoney(c.revenue)}</td>
+  </tr>`).join('');
+}
+renderCampaignTable();
+document.querySelectorAll('#tab-campaigns table.main thead th[data-key]').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const key = th.dataset.key;
+    if(cSortKey===key){ cSortDir*=-1; } else { cSortKey=key; cSortDir = key==='date' ? 1 : -1; }
+    document.querySelectorAll('#tab-campaigns table.main thead th').forEach(t=>t.classList.remove('activecol'));
+    th.classList.add('activecol'); renderCampaignTable();
+  });
+});
+document.getElementById('cSearchBox').addEventListener('input', e=>{ cSearch=e.target.value; renderCampaignTable(); });
+document.getElementById('cCatFilters').addEventListener('click', e=>{
+  const btn = e.target.closest('.f-btn'); if(!btn) return;
+  document.querySelectorAll('#cCatFilters .f-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on'); cCatFilter = btn.dataset.cat; renderCampaignTable();
+});
+</script>
+</body>
+</html>
